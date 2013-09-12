@@ -1,0 +1,631 @@
+#LyX 2.0 created this file. For more info see http://www.lyx.org/
+\lyxformat 413
+\begin_document
+\begin_header
+\textclass article
+\begin_preamble
+\usepackage{qtree}
+\usepackage{tree-dvips}
+\usepackage{ulem}
+\usepackage{graphicx}
+\newsavebox{\partbox}
+\DeclareMathOperator*{\argmax}{arg\,max}
+\end_preamble
+\use_default_options true
+\maintain_unincluded_children false
+\language english
+\language_package default
+\inputencoding auto
+\fontencoding global
+\font_roman default
+\font_sans default
+\font_typewriter default
+\font_default_family default
+\use_non_tex_fonts false
+\font_sc false
+\font_osf false
+\font_sf_scale 100
+\font_tt_scale 100
+
+\graphics default
+\default_output_format default
+\output_sync 0
+\bibtex_command default
+\index_command default
+\paperfontsize default
+\spacing onehalf
+\use_hyperref false
+\papersize default
+\use_geometry false
+\use_amsmath 1
+\use_esint 1
+\use_mhchem 1
+\use_mathdots 1
+\cite_engine basic
+\use_bibtopic false
+\use_indices false
+\paperorientation portrait
+\suppress_date false
+\use_refstyle 1
+\index Index
+\shortcut idx
+\color #008000
+\end_index
+\secnumdepth 3
+\tocdepth 3
+\paragraph_separation indent
+\paragraph_indentation default
+\quotes_language english
+\papercolumns 1
+\papersides 1
+\paperpagestyle default
+\tracking_changes false
+\output_changes false
+\html_math_output 0
+\html_css_as_file 0
+\html_be_strict false
+\end_header
+
+\begin_body
+
+\begin_layout Title
+A Topical Collocation Model
+\end_layout
+
+\begin_layout Author
+Benjamin Börschinger
+\end_layout
+
+\begin_layout Date
+09/12/2013
+\end_layout
+
+\begin_layout Standard
+These are some notes on a non-grammar version of Mark Johnson's Topic Collocatio
+n Model.
+ While equivalent to the original model, this re-formulation allows for
+ faster inference using a break-point sampler, rather than having to perform
+ actual parsing.
+ In addition, the sampler we describe might be applied to related uses of
+ the Collocation-modeling idea, e.g.
+ in word-segmentation.
+\end_layout
+
+\begin_layout Section
+The Topic Collocation Grammar
+\end_layout
+
+\begin_layout Standard
+Johnson (2010) introduced the Topic Collocation Grammar (TCG) that is a
+ non-parametric extension of LDA.
+ Whereas the HDP (Teh et al., 2006) uses non-parametric priors to allow for
+ an unbounded number of possible topics, the TCG uses non-parametric priors
+ to allow for an unbounded vocabulary, making it possible to learn semantically
+ coherent topical units such as 
+\begin_inset Quotes eld
+\end_inset
+
+electrical circuit board
+\begin_inset Quotes erd
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Standard
+It's original presentation makes use of Adaptor Grammars, an extension of
+ PCFGs which allows for a simple specification of certain models by defining
+ the generative process as that of generating a tree using context-free
+ rules.
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\begin{align*}
+\text{Base} & =\text{WordGen}(\Phi_{Base},p_{\#})\\
+\theta_{i} & \sim\text{Dir}(\boldsymbol{\alpha}_{\theta})\\
+\phi_{k} & \sim\text{DP}(\alpha_{\phi},\text{Base})\\
+z_{i,j}\mid\boldsymbol{\theta} & \sim\text{Disc}(\theta_{i})\\
+c_{i,j}\mid z_{i,j},\boldsymbol{\phi} & \sim\phi_{z_{i,j}}
+\end{align*}
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+In words, we assume a base-distribution which can generate sequences of
+ words.
+ We describe this distribution in more detail below although we simply assume
+ a Unigram process with fixed emission probabilities 
+\begin_inset Formula $\Phi_{Base}$
+\end_inset
+
+ and a fixed termination-probability 
+\begin_inset Formula $p_{\#}$
+\end_inset
+
+.
+ Fixing these parameters simplifies implementation of the inference algorithm
+ but is not required.
+ It is easy to put a Dirichlet prior on 
+\begin_inset Formula $\Phi_{Base}$
+\end_inset
+
+ and a Beta on 
+\begin_inset Formula $p_{\#}$
+\end_inset
+
+.
+\end_layout
+
+\begin_layout Standard
+For each of the 
+\begin_inset Formula $N$
+\end_inset
+
+ documents, we draw a document-specific mixture over topics, one 
+\begin_inset Formula $\theta_{i}$
+\end_inset
+
+ for each document 
+\begin_inset Formula $1\leq i\leq N$
+\end_inset
+
+.
+ We also generate 
+\begin_inset Formula $K$
+\end_inset
+
+ topics which are distributions over collocations, that is, sequences of
+ words.
+ This is achieved by drawing each 
+\begin_inset Formula $\phi_{k}$
+\end_inset
+
+ from a DP which takes as input the Base distribution.
+\end_layout
+
+\begin_layout Standard
+Finally, for each of the 
+\begin_inset Quotes eld
+\end_inset
+
+units
+\begin_inset Quotes erd
+\end_inset
+
+ in each of the documents, we generate a topic indicator from the document
+ specific distribution over topics and then the actual unit by using the
+ corresponding topic distribution over collocations.
+\end_layout
+
+\begin_layout Section
+Inference
+\end_layout
+
+\begin_layout Standard
+Inference in this model is complicated by the fact that we do not actually
+ know the number of units in a given document as the actual observations
+ are not 
+\begin_inset Formula $c_{i,j}$
+\end_inset
+
+s but the 
+\begin_inset Formula $w_{i,k}$
+\end_inset
+
+s that make up the collocations.
+ This is illustrated by a toy example using 3 words which, already, are
+ compatible with 4 different hypotheses about the extent of the 
+\begin_inset Formula $c_{i,j}$
+\end_inset
+
+s, illustrated by bracketing.
+\end_layout
+
+\begin_layout Itemize
+(electric circuit boards)
+\begin_inset Formula $_{1}$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Itemize
+(electric)
+\begin_inset Formula $_{1}$
+\end_inset
+
+(circuit)
+\begin_inset Formula $_{2}$
+\end_inset
+
+(boards)
+\begin_inset Formula $_{3}$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Itemize
+(electric circuit)
+\begin_inset Formula $_{1}$
+\end_inset
+
+(boards)
+\begin_inset Formula $_{2}$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Itemize
+(electric)
+\begin_inset Formula $_{1}$
+\end_inset
+
+(circuit boards)
+\begin_inset Formula $_{2}$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+In addition to the actual grouping, the assignment to topics is also latent,
+ as in standard topic-models.
+ Assuming a single topic, however, we can immediately make the connection
+ to the Goldwater Unigram model of Word Segmentation model, equating words
+ in the TCG case with characters in the WS case.
+ Goldwater introduced a conceptually simple and easy to implement sampler
+ for her Word Segmentation by realizing that each possible hypothesis about
+ the latent word-variables corresponds to a binary vector of boundary indicators
+, and that it is easy to derive a Gibbs-Sampler over this representation.
+\end_layout
+
+\begin_layout Standard
+We will apply this idea directly to the TCG in the following paragraph.
+ We will focus on the case of a single document for simplicity.
+\end_layout
+
+\begin_layout Subsection
+State-space
+\end_layout
+
+\begin_layout Standard
+The following latent-variables need to be performed inference for.
+\end_layout
+
+\begin_layout Itemize
+the document specific distribution over topics 
+\begin_inset Formula $\theta$
+\end_inset
+
+
+\end_layout
+
+\begin_layout Itemize
+the 
+\begin_inset Formula $K$
+\end_inset
+
+ topic distributions 
+\begin_inset Formula $\phi_{k}$
+\end_inset
+
+, all of which are draws from (independent) DPs
+\end_layout
+
+\begin_layout Itemize
+the 
+\begin_inset Formula $N$
+\end_inset
+
+ topic indicators 
+\begin_inset Formula $z_{i}$
+\end_inset
+
+, where 
+\begin_inset Formula $N$
+\end_inset
+
+ is the (latent) number of collocations
+\end_layout
+
+\begin_layout Itemize
+the actual 
+\begin_inset Formula $N$
+\end_inset
+
+ collocations 
+\begin_inset Formula $c_{i}$
+\end_inset
+
+, where we constrain these such that their linear concatenation gives rise
+ to the actually observed sequence of words 
+\begin_inset Formula $w_{1:N'}$
+\end_inset
+
+ of 
+\begin_inset Formula $N'$
+\end_inset
+
+ words
+\end_layout
+
+\begin_layout Standard
+We integrate out 
+\begin_inset Formula $\theta$
+\end_inset
+
+ and, crucially, all of the 
+\begin_inset Formula $K$
+\end_inset
+
+ topic distributions, giving rise to the well-known Posterior Predictive
+ Distributions described by the CRP.
+ If the base-distribution for the DPs is fixed, we can ignore the actual
+ seating arrangements as we have a non-hierarchical DP model in this case,
+ simplifying book-keeping.
+ It's straight-forward to derive the added complications a non-fixed base-distri
+bution raises (see Börschinger and Johnson (2011) for details).
+\end_layout
+
+\begin_layout Standard
+The actual state-space of our sampler consists of 
+\begin_inset Formula $N'$
+\end_inset
+
+ 
+\begin_inset Formula $K$
+\end_inset
+
+-valued variables that indicate the presence of a Collocation boundary,
+ as well as the Topic from which this collocation came.
+ This is analogous to the Goldwater (2007) sampler, except that rather than
+ a binary choice a 
+\begin_inset Formula $K$
+\end_inset
+
++1-ary choice needs to be made at every possible break-point.
+\end_layout
+
+\begin_layout Subsubsection
+Example
+\end_layout
+
+\begin_layout Standard
+Assume 
+\begin_inset Formula $w_{1:4}=\text{red\,\ electric\,\ circuit\,\ boards}$
+\end_inset
+
+, and our current indicator vector is 
+\begin_inset Formula $b=\langle3,0,0,1\rangle$
+\end_inset
+
+.
+ This vector encodes the following analysis
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\[
+(\text{red})_{3}(\text{electric circuit boards})_{1}
+\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+That is, there are two collocations, one spanning the single word 
+\begin_inset Quotes eld
+\end_inset
+
+red
+\begin_inset Quotes erd
+\end_inset
+
+ and coming from Topic 3, and one spanning the words 
+\begin_inset Quotes eld
+\end_inset
+
+electric circuit boards
+\begin_inset Quotes erd
+\end_inset
+
+ and coming from Topic 1.
+ Let us now resample the value for the first variable.
+ Removing knowledge about it gives the partial vector 
+\begin_inset Formula $b=\langle?,0,0,1\rangle$
+\end_inset
+
+ which, just as in word segmentation, requires us to be non-commital with
+ all affected aspects of the previous analysis.
+ In fact, this affects the entire document as the next boundary already
+ is the end of the document.
+ Consequently, we would need to
+\end_layout
+
+\begin_layout Itemize
+remove one count for having used Topic 3
+\end_layout
+
+\begin_layout Itemize
+remove onecount for having used Topic 1
+\end_layout
+
+\begin_layout Itemize
+remove one count for having 
+\begin_inset Quotes eld
+\end_inset
+
+red
+\begin_inset Quotes erd
+\end_inset
+
+ in Topic 3
+\end_layout
+
+\begin_layout Itemize
+remove one count for having 
+\begin_inset Quotes eld
+\end_inset
+
+electric circuit boards
+\begin_inset Quotes erd
+\end_inset
+
+ in Topic 1
+\end_layout
+
+\begin_layout Itemize
+adjust the overall count of generated Topics / collocations (if there were
+ 
+\begin_inset Formula $n_{3}$
+\end_inset
+
+ uses of Topic 3 before, now there are 
+\begin_inset Formula $n_{3}-1$
+\end_inset
+
+; if there were 
+\begin_inset Formula $n_{3,red}$
+\end_inset
+
+ uses of 
+\begin_inset Quotes eld
+\end_inset
+
+red
+\begin_inset Quotes erd
+\end_inset
+
+ in Topic 3, now there are 
+\begin_inset Formula $n_{3,red}-1$
+\end_inset
+
+ such uses
+\end_layout
+
+\begin_layout Standard
+Having made these adjustments, we can calculate the probability of all possible
+ ways of setting 
+\begin_inset Formula $?$
+\end_inset
+
+.
+ Setting it to 
+\begin_inset Formula $0$
+\end_inset
+
+ woudl give rise to the analysis
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\[
+(\text{red electric circuit boards})_{1}
+\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+which differs from the original state in having this collocation.
+ Hence, we simply have to calculate
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\[
+P(\text{red electric circuit boards}|\text{Counts}_{1})P(\text{topic1}\mid\text{Counts})[P(\text{stop})]
+\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+where the first factor corresponds to the probability of generating the
+ actual string from the Topic-1-CRP, given its current counts, and the second
+ factor is the probability of generating anything from Topic1 in the current
+ document, given the counts of Topic-uses.
+ The third factor is 
+\begin_inset Quotes eld
+\end_inset
+
+optional
+\begin_inset Quotes erd
+\end_inset
+
+ --- without it, we don't have a fully generative model as we wouldn't be
+ able determine the number of collocations.
+ It's impact is minor in word segmentation but make sense here, it allows
+ weak control over the number of collocations: setting termination probability
+ low encourages analyses with many short collocations, setting it high encourage
+s the use of few collocations.
+\end_layout
+
+\begin_layout Standard
+Let's consider setting 
+\begin_inset Formula $?$
+\end_inset
+
+ to any specific topic 
+\begin_inset Formula $x\in\{1..K\}$
+\end_inset
+
+.
+ This gives rise to
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\[
+(\text{red})_{x}(\text{electric circuit boards})_{1}
+\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+This time, the formula includes four more factors
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\[
+P(\text{red}\mid\text{Counts}_{x})P(x\mid\text{Counts})(1-P(\text{stop}))P(\text{electric...}\mid\text{Counts}_{1}+\{\text{red}\})P(1\mid\text{Counts }+\{x\})P(\text{stop})
+\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Note that we need to update the counts appropriately as the predictive probabili
+ties for the second collocation are affected by our decision for the first
+ collocation.
+ Also note the additional (1-
+\begin_inset Formula $P(\text{stop})$
+\end_inset
+
+) factor which adds additional cost for positing one more collocation.
+\end_layout
+
+\begin_layout Standard
+That's it.
+\end_layout
+
+\end_body
+\end_document
