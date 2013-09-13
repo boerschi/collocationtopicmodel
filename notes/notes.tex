@@ -4,7 +4,10 @@
 \usepackage[T1]{fontenc}
 \usepackage[latin9]{inputenc}
 \usepackage{amsmath}
+\usepackage{amssymb}
 \usepackage{setspace}
+\PassOptionsToPackage{normalem}{ulem}
+\usepackage{ulem}
 \onehalfspacing
 
 \makeatletter
@@ -53,10 +56,12 @@ by defining the generative process as that of generating a tree using
 context-free rules.
 
 \begin{align*}
-\text{Base} & =\text{WordGen}(\Phi_{Base},p_{\#})\\
+\text{Base} & =\text{CollocGen}(\Phi_{Base},p_{\#})\\
 \theta_{i} & \sim\text{Dir}(\boldsymbol{\alpha}_{\theta})\\
 \phi_{k} & \sim\text{DP}(\alpha_{\phi},\text{Base})\\
-z_{i,j}\mid\boldsymbol{\theta} & \sim\text{Disc}(\theta_{i})\\
+z_{i,1}\mid\boldsymbol{\theta} & \sim\text{Disc}(\theta_{i})\\
+P(z_{i,j}=\text{STOP}\mid\boldsymbol{\theta},p_{Stop}) & =p_{stop}\\
+P(z_{i,j}=x\mid\boldsymbol{\theta},p_{Stop}) & =(1-p_{stop})\theta_{i,x}\\
 c_{i,j}\mid z_{i,j},\boldsymbol{\phi} & \sim\phi_{z_{i,j}}
 \end{align*}
 
@@ -75,10 +80,17 @@ We also generate $K$ topics which are distributions over collocations,
 that is, sequences of words. This is achieved by drawing each $\phi_{k}$
 from a DP which takes as input the Base distribution.
 
-Finally, for each of the ``units'' in each of the documents, we
-generate a topic indicator from the document specific distribution
-over topics and then the actual unit by using the corresponding topic
-distribution over collocations.
+Finally, we generate the documents by definitely generating a first
+topic-indicator. We keep generating topic-indicators until we generate
+the stop-symbol, the math might have to be written differently, but
+it should convey the idea. Finally, the actual collocations are generated
+from the respective topic-specific distributions.
+
+Linking it back to Johnson's original formulation, our Base-distribution
+corresponds to the distribution defined by the ``Words''-non-terminal,
+the $\phi_{i}$-distributions correspond to the ``\uline{Topic$_{i}$}''
+adapted non-terminals, and the $\theta$s, $z$s and $p_{stop}$ parameters
+capture the document-mixture branching process.
 
 
 \section{Inference}
@@ -150,12 +162,42 @@ encodes the following analysis
 
 That is, there are two collocations, one spanning the single word
 ``red'' and coming from Topic 3, and one spanning the words ``electric
-circuit boards'' and coming from Topic 1. Let us now resample the
-value for the first variable. Removing knowledge about it gives the
-partial vector $b=\langle?,0,0,1\rangle$ which, just as in word segmentation,
-requires us to be non-commital with all affected aspects of the previous
-analysis. In fact, this affects the entire document as the next boundary
-already is the end of the document. Consequently, we would need to
+circuit boards'' and coming from Topic 1. It is trivial to map this
+back to latent variables and then, calculate this state's probability:
+
+\begin{align*}
+z_{1} & =3\\
+z_{2} & =1\\
+z_{3} & =\text{STOP}\\
+c_{1} & =\text{red}\\
+c_{2} & =\text{electric circuit boards}
+\end{align*}
+
+
+We get
+
+\[
+P(z_{1},z_{2},z_{3},c_{1},c_{2}\mid\mu)=\frac{\alpha_{\theta}}{K\alpha_{\theta}}\text{CollocGen}(\text{red})(1-p_{stop})\frac{\alpha_{\theta}}{K\alpha_{\theta}+1}\text{CollocGen}(\text{electric circuit boards})p_{stop}
+\]
+
+
+Note how the topic-distribution has been ``updated'', hence the
+denominator has an additional count because $z_{1}$ had to be generated.
+Because this is all the data there is, the topics have to back-off
+to the base, hence we only have WordGen-factors. For illustration,
+if $z_{1}=1$, we would have gotten
+
+\[
+P(z_{1},z_{2},z_{3},c_{1},c_{2}\mid\mu)=\frac{\alpha_{\theta}}{K\alpha_{\theta}}\text{CollocGen}(\text{red})(1-p_{stop})\frac{\alpha_{\theta}+1}{K\alpha_{\theta}+1}\frac{\alpha_{\phi}\text{CollocGen}(\text{electric circuit boards})}{\alpha_{\phi}+1}p_{stop}
+\]
+
+
+Let us now resample the value for the first variable. Removing knowledge
+about it gives the partial vector $b=\langle?,0,0,1\rangle$ which,
+just as in word segmentation, requires us to be non-commital with
+all affected aspects of the previous analysis. In fact, this affects
+the entire document as the next boundary already is the end of the
+document. Consequently, we would need to
 \begin{itemize}
 \item remove one count for having used Topic 3
 \item remove onecount for having used Topic 1
@@ -168,7 +210,7 @@ there were $n_{3,red}$ uses of ``red'' in Topic 3, now there are
 $n_{3,red}-1$ such uses
 \end{itemize}
 Having made these adjustments, we can calculate the probability of
-all possible ways of setting $?$. Setting it to $0$ woudl give rise
+all possible ways of setting $?$. Setting it to $0$ would give rise
 to the analysis
 
 \[
@@ -176,44 +218,36 @@ to the analysis
 \]
 
 
-which differs from the original state in having this collocation.
-Hence, we simply have to calculate
+via the new set of latent-variables $z_{1}=1$, $z_{2}=\text{STOP}$,
+$c_{1}=$red electric circuit boards. We have
 
 \[
-P(\text{red electric circuit boards}|\text{Counts}_{1})P(\text{topic1}\mid\text{Counts})[P(\text{stop})]
+P(z_{1},z_{2},c_{1}\mid\mu)=\frac{\alpha_{\theta}}{K\alpha_{\theta}}\text{CollocGen}(\text{red electric circuit boards})p_{stop}
 \]
 
 
-where the first factor corresponds to the probability of generating
-the actual string from the Topic-1-CRP, given its current counts,
-and the second factor is the probability of generating anything from
-Topic1 in the current document, given the counts of Topic-uses. The
-third factor is ``optional'' --- without it, we don't have a fully
-generative model as we wouldn't be able determine the number of collocations.
-It's impact is minor in word segmentation but make sense here, it
-allows weak control over the number of collocations: setting termination
-probability low encourages analyses with many short collocations,
-setting it high encourages the use of few collocations.
-
 Let's consider setting $?$ to any specific topic $x\in\{1..K\}$.
-This gives rise to
+This gives rise to $z_{1}=x$, $z_{2}$=1 (note how this value doesn't
+change because you condition on $b_{4}=1$), $z_{3}=$STOP, $c_{1}=$red,
+$c_{2}$=electric circuit boards.
 
 \[
 (\text{red})_{x}(\text{electric circuit boards})_{1}
 \]
 
 
-This time, the formula includes four more factors
+So,
 
 \[
-P(\text{red}\mid\text{Counts}_{x})P(x\mid\text{Counts})(1-P(\text{stop}))P(\text{electric...}\mid\text{Counts}_{1}+\{\text{red}\})P(1\mid\text{Counts }+\{x\})P(\text{stop})
+P(z_{1},z_{2},z_{3},c_{1},c_{2}\mid\mu)=\frac{\alpha_{\theta}}{K\alpha_{\theta}}\text{CollocGen}(\text{red})(1-p_{stop})\frac{\alpha_{\theta}+\mathbb{I}_{x=1}}{K\alpha_{\theta}+\mathbb{I}_{x=1}}\frac{\alpha_{\phi}\text{CollocGen}(\dots)+\mathbb{I}_{x=1}}{\alpha_{\phi}+\mathbb{I}_{x=1}}p_{stop}
 \]
 
 
-Note that we need to update the counts appropriately as the predictive
-probabilities for the second collocation are affected by our decision
-for the first collocation. Also note the additional (1-$P(\text{stop})$)
-factor which adds additional cost for positing one more collocation.
-
-That's it.
+That's basically it. Note that you also need to resample the final
+value of $b$ which must not take 0, as there always is a known utterance
+boundary but you still need to resample the topic of the final collocation.
+The most important thing is efficient book-keeping, as usually, there's
+lots of utterances and types. And efficient identification of the
+parts of the current analysis that change, such that you can update
+the counts.
 \end{document}

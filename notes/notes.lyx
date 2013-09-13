@@ -122,10 +122,12 @@ It's original presentation makes use of Adaptor Grammars, an extension of
 \begin_layout Standard
 \begin_inset Formula 
 \begin{align*}
-\text{Base} & =\text{WordGen}(\Phi_{Base},p_{\#})\\
+\text{Base} & =\text{CollocGen}(\Phi_{Base},p_{\#})\\
 \theta_{i} & \sim\text{Dir}(\boldsymbol{\alpha}_{\theta})\\
 \phi_{k} & \sim\text{DP}(\alpha_{\phi},\text{Base})\\
-z_{i,j}\mid\boldsymbol{\theta} & \sim\text{Disc}(\theta_{i})\\
+z_{i,1}\mid\boldsymbol{\theta} & \sim\text{Disc}(\theta_{i})\\
+P(z_{i,j}=\text{STOP}\mid\boldsymbol{\theta},p_{Stop}) & =p_{stop}\\
+P(z_{i,j}=x\mid\boldsymbol{\theta},p_{Stop}) & =(1-p_{stop})\theta_{i,x}\\
 c_{i,j}\mid z_{i,j},\boldsymbol{\phi} & \sim\phi_{z_{i,j}}
 \end{align*}
 
@@ -188,17 +190,58 @@ For each of the
 \end_layout
 
 \begin_layout Standard
-Finally, for each of the 
+Finally, we generate the documents by definitely generating a first topic-indica
+tor.
+ We keep generating topic-indicators until we generate the stop-symbol,
+ the math might have to be written differently, but it should convey the
+ idea.
+ Finally, the actual collocations are generated from the respective topic-specif
+ic distributions.
+\end_layout
+
+\begin_layout Standard
+Linking it back to Johnson's original formulation, our Base-distribution
+ corresponds to the distribution defined by the 
 \begin_inset Quotes eld
 \end_inset
 
-units
+Words
 \begin_inset Quotes erd
 \end_inset
 
- in each of the documents, we generate a topic indicator from the document
- specific distribution over topics and then the actual unit by using the
- corresponding topic distribution over collocations.
+-non-terminal, the 
+\begin_inset Formula $\phi_{i}$
+\end_inset
+
+-distributions correspond to the 
+\begin_inset Quotes eld
+\end_inset
+
+
+\bar under
+Topic
+\begin_inset Formula $_{i}$
+\end_inset
+
+
+\bar default
+
+\begin_inset Quotes erd
+\end_inset
+
+ adapted non-terminals, and the 
+\begin_inset Formula $\theta$
+\end_inset
+
+s, 
+\begin_inset Formula $z$
+\end_inset
+
+s and 
+\begin_inset Formula $p_{stop}$
+\end_inset
+
+ parameters capture the document-mixture branching process.
 \end_layout
 
 \begin_layout Section
@@ -438,7 +481,88 @@ electric circuit boards
 \end_inset
 
  and coming from Topic 1.
- Let us now resample the value for the first variable.
+ It is trivial to map this back to latent variables and then, calculate
+ this state's probability:
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\begin{align*}
+z_{1} & =3\\
+z_{2} & =1\\
+z_{3} & =\text{STOP}\\
+c_{1} & =\text{red}\\
+c_{2} & =\text{electric circuit boards}
+\end{align*}
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+We get
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\[
+P(z_{1},z_{2},z_{3},c_{1},c_{2}\mid\mu)=\frac{\alpha_{\theta}}{K\alpha_{\theta}}\text{CollocGen}(\text{red})(1-p_{stop})\frac{\alpha_{\theta}}{K\alpha_{\theta}+1}\text{CollocGen}(\text{electric circuit boards})p_{stop}
+\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Note how the topic-distribution has been 
+\begin_inset Quotes eld
+\end_inset
+
+updated
+\begin_inset Quotes erd
+\end_inset
+
+, hence the denominator has an additional count because 
+\begin_inset Formula $z_{1}$
+\end_inset
+
+ had to be generated.
+ Because this is all the data there is, the topics have to back-off to the
+ base, hence we only have WordGen-factors.
+ For illustration, if 
+\begin_inset Formula $z_{1}=1$
+\end_inset
+
+, we would have gotten
+\end_layout
+
+\begin_layout Standard
+
+\family roman
+\series medium
+\shape up
+\size normal
+\emph off
+\bar no
+\strikeout off
+\uuline off
+\uwave off
+\noun off
+\color none
+\begin_inset Formula 
+\[
+P(z_{1},z_{2},z_{3},c_{1},c_{2}\mid\mu)=\frac{\alpha_{\theta}}{K\alpha_{\theta}}\text{CollocGen}(\text{red})(1-p_{stop})\frac{\alpha_{\theta}+1}{K\alpha_{\theta}+1}\frac{\alpha_{\phi}\text{CollocGen}(\text{electric circuit boards})}{\alpha_{\phi}+1}p_{stop}
+\]
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+Let us now resample the value for the first variable.
  Removing knowledge about it gives the partial vector 
 \begin_inset Formula $b=\langle?,0,0,1\rangle$
 \end_inset
@@ -522,7 +646,7 @@ Having made these adjustments, we can calculate the probability of all possible
 \begin_inset Formula $0$
 \end_inset
 
- woudl give rise to the analysis
+ would give rise to the analysis
 \end_layout
 
 \begin_layout Standard
@@ -537,40 +661,31 @@ Having made these adjustments, we can calculate the probability of all possible
 \end_layout
 
 \begin_layout Standard
-which differs from the original state in having this collocation.
- Hence, we simply have to calculate
+via the new set of latent-variables 
+\begin_inset Formula $z_{1}=1$
+\end_inset
+
+, 
+\begin_inset Formula $z_{2}=\text{STOP}$
+\end_inset
+
+, 
+\begin_inset Formula $c_{1}=$
+\end_inset
+
+red electric circuit boards.
+ We have
 \end_layout
 
 \begin_layout Standard
 \begin_inset Formula 
 \[
-P(\text{red electric circuit boards}|\text{Counts}_{1})P(\text{topic1}\mid\text{Counts})[P(\text{stop})]
+P(z_{1},z_{2},c_{1}\mid\mu)=\frac{\alpha_{\theta}}{K\alpha_{\theta}}\text{CollocGen}(\text{red electric circuit boards})p_{stop}
 \]
 
 \end_inset
 
 
-\end_layout
-
-\begin_layout Standard
-where the first factor corresponds to the probability of generating the
- actual string from the Topic-1-CRP, given its current counts, and the second
- factor is the probability of generating anything from Topic1 in the current
- document, given the counts of Topic-uses.
- The third factor is 
-\begin_inset Quotes eld
-\end_inset
-
-optional
-\begin_inset Quotes erd
-\end_inset
-
- --- without it, we don't have a fully generative model as we wouldn't be
- able determine the number of collocations.
- It's impact is minor in word segmentation but make sense here, it allows
- weak control over the number of collocations: setting termination probability
- low encourages analyses with many short collocations, setting it high encourage
-s the use of few collocations.
 \end_layout
 
 \begin_layout Standard
@@ -583,7 +698,31 @@ Let's consider setting
 \end_inset
 
 .
- This gives rise to
+ This gives rise to 
+\begin_inset Formula $z_{1}=x$
+\end_inset
+
+, 
+\begin_inset Formula $z_{2}$
+\end_inset
+
+=1 (note how this value doesn't change because you condition on 
+\begin_inset Formula $b_{4}=1$
+\end_inset
+
+), 
+\begin_inset Formula $z_{3}=$
+\end_inset
+
+STOP, 
+\begin_inset Formula $c_{1}=$
+\end_inset
+
+red, 
+\begin_inset Formula $c_{2}$
+\end_inset
+
+=electric circuit boards.
 \end_layout
 
 \begin_layout Standard
@@ -598,13 +737,13 @@ Let's consider setting
 \end_layout
 
 \begin_layout Standard
-This time, the formula includes four more factors
+So,
 \end_layout
 
 \begin_layout Standard
 \begin_inset Formula 
 \[
-P(\text{red}\mid\text{Counts}_{x})P(x\mid\text{Counts})(1-P(\text{stop}))P(\text{electric...}\mid\text{Counts}_{1}+\{\text{red}\})P(1\mid\text{Counts }+\{x\})P(\text{stop})
+P(z_{1},z_{2},z_{3},c_{1},c_{2}\mid\mu)=\frac{\alpha_{\theta}}{K\alpha_{\theta}}\text{CollocGen}(\text{red})(1-p_{stop})\frac{\alpha_{\theta}+\mathbb{I}_{x=1}}{K\alpha_{\theta}+\mathbb{I}_{x=1}}\frac{\alpha_{\phi}\text{CollocGen}(\dots)+\mathbb{I}_{x=1}}{\alpha_{\phi}+\mathbb{I}_{x=1}}p_{stop}
 \]
 
 \end_inset
@@ -613,18 +752,17 @@ P(\text{red}\mid\text{Counts}_{x})P(x\mid\text{Counts})(1-P(\text{stop}))P(\text
 \end_layout
 
 \begin_layout Standard
-Note that we need to update the counts appropriately as the predictive probabili
-ties for the second collocation are affected by our decision for the first
- collocation.
- Also note the additional (1-
-\begin_inset Formula $P(\text{stop})$
+That's basically it.
+ Note that you also need to resample the final value of 
+\begin_inset Formula $b$
 \end_inset
 
-) factor which adds additional cost for positing one more collocation.
-\end_layout
-
-\begin_layout Standard
-That's it.
+ which must not take 0, as there always is a known utterance boundary but
+ you still need to resample the topic of the final collocation.
+ The most important thing is efficient book-keeping, as usually, there's
+ lots of utterances and types.
+ And efficient identification of the parts of the current analysis that
+ change, such that you can update the counts.
 \end_layout
 
 \end_body
